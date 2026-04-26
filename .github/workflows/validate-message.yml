@@ -1,0 +1,43 @@
+name: Validate incoming message
+
+on:
+  push:
+    paths:
+      - 'inbox/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check message format
+        run: |
+          for file in inbox/*.md; do
+            [ -f "$file" ] || continue
+            echo "Validating $file..."
+
+            # Verificar que tiene frontmatter
+            if ! head -1 "$file" | grep -q "^---$"; then
+              echo "❌ $file: missing frontmatter"
+              exit 1
+            fi
+
+            # Verificar campos requeridos
+            for field in type from to sent_at; do
+              if ! grep -q "^${field}:" "$file"; then
+                echo "❌ $file: missing field '${field}'"
+                exit 1
+              fi
+            done
+
+            # Verificar type válido
+            TYPE=$(grep "^type:" "$file" | head -1 | sed 's/type: *//')
+            VALID_TYPES="PROPONE COMPROMETO LEVANTA PREGUNTO RESPONDO ENTREGO APRUEBO RECHAZO CIERRO OBSERVO"
+            if ! echo "$VALID_TYPES" | grep -qw "$TYPE"; then
+              echo "❌ $file: invalid type '$TYPE'"
+              exit 1
+            fi
+
+            echo "✅ $file OK (type=$TYPE)"
+          done
